@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tic‑Tac‑Toe — Clean UI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* small extra styles to complement Tailwind */
+    .cell {
+      aspect-ratio: 1/1;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: clamp(1.5rem, 4vw, 3.2rem);
+      user-select: none;
+      cursor: pointer;
+      transition: background-color 160ms ease, transform 120ms ease;
+    }
+    .cell:active { transform: scale(.98); }
+    .cell.x { color: #0ea5a4; }
+    .cell.o { color: #fb7185; }
+    .cell.win { background: linear-gradient(90deg, rgba(99,102,241,0.08), rgba(236,72,153,0.04)); }
+    .board { gap: 8px; }
+    .disabled { pointer-events: none; opacity: 0.9; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-6">
+  <main class="max-w-xl w-full">
+    <section class="bg-white shadow-lg rounded-2xl p-6">
+      <header class="flex items-center justify-between mb-4">
+        <div>
+          <h1 class="text-2xl font-extrabold text-slate-800">Tic‑Tac‑Toe</h1>
+          <p class="text-sm text-slate-500">Clean UI • Responsive • Friendly</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-sm text-slate-600 text-right">
+            <div>Turn: <span id="turn" class="font-semibold">X</span></div>
+            <div class="text-xs text-slate-400">Click any empty cell to play</div>
+          </div>
+          <button id="restart" class="px-3 py-1 rounded-xl bg-indigo-600 text-white text-sm hover:bg-indigo-700">Restart</button>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-3 board" id="boardContainer"></div>
+
+      <footer class="mt-5 flex items-center justify-between">
+        <div class="flex gap-4 items-center">
+          <div class="text-sm">Score</div>
+          <div class="flex gap-2 items-center text-sm">
+            <div class="px-3 py-1 rounded-md bg-teal-50 text-teal-600 font-semibold">X: <span id="scoreX">0</span></div>
+            <div class="px-3 py-1 rounded-md bg-pink-50 text-pink-600 font-semibold">O: <span id="scoreO">0</span></div>
+            <div class="px-3 py-1 rounded-md bg-slate-50 text-slate-600 font-semibold">T: <span id="scoreT">0</span></div>
+          </div>
+        </div>
+        <div class="text-sm text-slate-500">Made with Tailwind • Accessible</div>
+      </footer>
+    </section>
+
+    <section class="mt-4 text-xs text-slate-500 text-center">
+      Tip: Press <kbd class="px-2 py-1 bg-slate-100 rounded">R</kbd> to restart. Click <kbd class="px-2 py-1 bg-slate-100 rounded">H</kbd> to toggle highlight of winning cells.
+    </section>
+  </main>
+
+  <script>
+    // Game state
+    const boardContainer = document.getElementById('boardContainer');
+    const turnEl = document.getElementById('turn');
+    const restartBtn = document.getElementById('restart');
+    const scoreXEl = document.getElementById('scoreX');
+    const scoreOEl = document.getElementById('scoreO');
+    const scoreTEl = document.getElementById('scoreT');
+
+    let board = Array(9).fill(null);
+    let current = 'X';
+    let running = true;
+    let scores = { X: 0, O: 0, T: 0 };
+    let highlight = true;
+
+    const wins = [
+      [0,1,2],[3,4,5],[6,7,8], // rows
+      [0,3,6],[1,4,7],[2,5,8], // cols
+      [0,4,8],[2,4,6] // diags
+    ];
+
+    function createBoard(){
+      boardContainer.innerHTML = '';
+      for(let i=0;i<9;i++){
+        const cell = document.createElement('button');
+        cell.className = 'cell rounded-lg bg-slate-50 border border-slate-100 shadow-sm';
+        cell.setAttribute('data-index', i);
+        cell.setAttribute('aria-label', 'Cell '+(i+1));
+        cell.setAttribute('role', 'button');
+        cell.addEventListener('click', onCellClick);
+        cell.addEventListener('keydown', (e)=>{ if(e.key==='Enter' || e.key===' ') onCellClick(e); });
+        boardContainer.appendChild(cell);
+      }
+      // grid styling via JS so it remains square and responsive
+      boardContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+      boardContainer.classList.add('mt-3');
+    }
+
+    function onCellClick(e){
+      if(!running) return;
+      const idx = Number(e.currentTarget.dataset.index);
+      if(board[idx]) return; // occupied
+      board[idx] = current;
+      render();
+      const outcome = checkOutcome();
+      if(outcome){
+        finishGame(outcome);
+      } else {
+        current = current === 'X' ? 'O' : 'X';
+        turnEl.textContent = current;
+      }
+    }
+
+    function render(){
+      const cells = boardContainer.children;
+      for(let i=0;i<9;i++){
+        const c = cells[i];
+        c.classList.remove('x','o','win');
+        c.textContent = board[i] ? board[i] : '';
+        if(board[i]) c.classList.add(board[i].toLowerCase());
+      }
+    }
+
+    function checkOutcome(){
+      // return { winner: 'X'/'O' or 'TIE', line: [i,j,k] or null }
+      for(const line of wins){
+        const [a,b,c] = line;
+        if(board[a] && board[a]===board[b] && board[a]===board[c]){
+          return { winner: board[a], line };
+        }
+      }
+      if(board.every(Boolean)) return { winner: 'TIE', line: null };
+      return null;
+    }
+
+    function finishGame(outcome){
+      running = false;
+      if(outcome.winner === 'TIE'){
+        scores.T++;
+        scoreTEl.textContent = scores.T;
+        showToast('Draw!');
+      } else {
+        scores[outcome.winner]++;
+        if(outcome.winner === 'X') scoreXEl.textContent = scores.X;
+        else scoreOEl.textContent = scores.O;
+        showToast(outcome.winner + ' wins!');
+        if(highlight && outcome.line){
+          outcome.line.forEach(i => boardContainer.children[i].classList.add('win'));
+        }
+      }
+      // disable board interactions visually
+      boardContainer.classList.add('disabled');
+    }
+
+    function restart(){
+      board = Array(9).fill(null);
+      running = true;
+      current = 'X';
+      turnEl.textContent = current;
+      boardContainer.classList.remove('disabled');
+      // clear win markers
+      Array.from(boardContainer.children).forEach(c=>c.classList.remove('win'));
+      render();
+    }
+
+    function showToast(message){
+      const t = document.createElement('div');
+      t.textContent = message;
+      t.className = 'fixed left-1/2 -translate-x-1/2 bottom-8 bg-slate-900 text-white px-4 py-2 rounded-md shadow-lg opacity-0';
+      document.body.appendChild(t);
+      // animate
+      requestAnimationFrame(()=>{ t.style.transition = 'opacity 240ms ease, transform 240ms ease'; t.style.opacity = '1'; t.style.transform = 'translateY(-6px)'; });
+      setTimeout(()=>{ t.style.opacity = '0'; t.style.transform = 'translateY(0)'; setTimeout(()=>t.remove(),280); }, 1200);
+    }
+
+    // keyboard shortcuts
+    document.addEventListener('keydown', (e)=>{
+      if(e.key.toLowerCase()==='r') restart();
+      if(e.key.toLowerCase()==='h'){ highlight = !highlight; document.body.classList.toggle('ring-2', highlight); }
+    });
+
+    // controls
+    restartBtn.addEventListener('click', restart);
+
+    // initial setup
+    createBoard();
+    render();
+
+    // make cells accessible focusable
+    Array.from(boardContainer.children).forEach(c=>c.tabIndex=0);
+
+    // ensure the home key 'cd' semantics: when user logs in 'cd' goes to their HOME; this app simply demonstrates UI.
+  </script>
+</body>
+</html>
+
